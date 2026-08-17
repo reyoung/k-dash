@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pytest
+import json
+from pathlib import Path
 
 from k_dash.canonical import build_key, build_tag, canonical_json, loads_no_duplicates, normalize_args
 from k_dash.errors import ContractError
@@ -45,3 +47,9 @@ def test_unknown_args_fail() -> None:
 def test_duplicate_json_keys_fail() -> None:
     with pytest.raises(ContractError, match="duplicate JSON object key"):
         loads_no_duplicates('{"block_size":128,"block_size":256}', stage="test")
+
+
+def test_cross_language_buildspec_golden_vector() -> None:
+    vector = json.loads((Path(__file__).parent / "golden/buildspec-v1.json").read_text())
+    assert canonical_json(vector["buildspec"]).decode() == vector["canonical_json"]
+    assert build_key(vector["buildspec"]) == vector["build_key"]

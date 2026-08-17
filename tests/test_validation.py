@@ -39,9 +39,13 @@ class _Versions:
 
 
 class _Elf:
-    header = {"e_machine": "EM_X86_64"}
-
-    def __init__(self, tags: list[_Tag], versions: list[str] | None = None):
+    def __init__(
+        self,
+        tags: list[_Tag],
+        versions: list[str] | None = None,
+        machine: str = "EM_X86_64",
+    ):
+        self.header = {"e_machine": machine}
         self._dynamic = _Dynamic(tags)
         self._versions = _Versions(versions or [])
 
@@ -172,3 +176,14 @@ def test_tvm_ffi_runtime_version_must_be_exact() -> None:
     validation.validate_tvm_ffi_runtime(config, "0.1.13.post3")
     with pytest.raises(ArtifactIntegrityError, match="does not match"):
         validation.validate_tvm_ffi_runtime(config, "0.1.12")
+
+
+def test_aarch64_elf_machine_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = b"ELF"
+    config = _config(payload)
+    config["buildspec"]["target"]["arch"] = "aarch64"
+    monkeypatch.setattr(validation, "ELFFile", lambda _: _Elf([], machine="EM_AARCH64"))
+    validation.validate_kernel_so(payload, config)
+    monkeypatch.setattr(validation, "ELFFile", lambda _: _Elf([], machine="EM_X86_64"))
+    with pytest.raises(ArtifactIntegrityError, match="ELF machine"):
+        validation.validate_kernel_so(payload, config)

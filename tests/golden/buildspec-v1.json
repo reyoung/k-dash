@@ -1,0 +1,23 @@
+{
+  "name": "defaults-unicode-free-sm90a",
+  "buildspec": {
+    "buildspec_version": 1,
+    "release_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "args": {
+      "block_size": 256,
+      "nested": {
+        "enabled": true
+      }
+    },
+    "target": {
+      "arch": "x86_64",
+      "cc": "sm_90a",
+      "cuda": "12.8",
+      "libc": "manylinux_2_28",
+      "os": "linux",
+      "tvm_ffi": "0.1.13.post3"
+    }
+  },
+  "canonical_json": "{\"args\":{\"block_size\":256,\"nested\":{\"enabled\":true}},\"buildspec_version\":1,\"release_digest\":\"sha256:0000000000000000000000000000000000000000000000000000000000000000\",\"target\":{\"arch\":\"x86_64\",\"cc\":\"sm_90a\",\"cuda\":\"12.8\",\"libc\":\"manylinux_2_28\",\"os\":\"linux\",\"tvm_ffi\":\"0.1.13.post3\"}}",
+  "build_key": "sha256:4db53954ee7e3790a023cb4d6400e17b5c5d4a91805cdb1331b242cff2b33f38"
+}
