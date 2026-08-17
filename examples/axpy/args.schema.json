@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "block_size": {
+      "type": "integer",
+      "enum": [128, 256, 512],
+      "default": 256
+    }
+  },
+  "additionalProperties": false
+}

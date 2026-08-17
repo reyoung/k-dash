@@ -104,7 +104,7 @@ args.schema.json
 .k-dash-ignore
 ```
 
-`k-dash.toml` 提供 Kernel identity 与 build API version，license 可选。`build.nix` 是 pure、sandboxed 的固定函数，接收 `kdlib`、锁定的 `pkgs` 与 BuildSpec，唯一有效输出是普通文件 `$out/kernel.so`。Kernel 自行把结构化 Args/Target 转成 C++ template、CuteDSL 参数或编译设置。详见 [Kernel Project Contract](./kernel-project-contract.md)。
+`k-dash.toml` 提供 Kernel identity 与 build API version，license 可选。`build.nix` 是 pure、sandboxed 的自包含固定函数，只接收锁定的 `pkgs` 与 BuildSpec；`k-dash init` 把 `mkTvmFfiKernel` 等构建 helper 的实现直接冻结进该文件，不依赖额外 `kdlib` input。唯一有效输出是普通文件 `$out/kernel.so`。Kernel 自行把结构化 Args/Target 转成 C++ template、CuteDSL 参数或编译设置。详见 [Kernel Project Contract](./kernel-project-contract.md)。
 
 ## Python load flow
 
@@ -141,7 +141,7 @@ TargetSpec 与 Kernel Args 分离。公共 `load` 不接受显式 Target。
 - Platform：Linux `x86_64`/`aarch64`，manylinux_2_28 baseline，精确 TVM-FFI ABI。
 - CC 9.0 及以上默认使用 architecture-specific `a` target，不自动使用 `f` 或普通 CC fallback。
 
-Build Artifact 只包含 `kernel.so`，不包含 Python 或其他动态库。基础 Linux ABI 使用严格 allowlist，`libstdc++`/`libgcc_s` 静态链接。Kernel 在 `build.nix` 声明逻辑 Host CUDA Dependency，k-dash 按 CUDA Target 解析 SONAME ABI major，例如 CUDA 12/13 的 cuBLAS 可以分别解析为 `.12`/`.13`；加载按 ABI major 与最低版本验证，不要求精确 patch。
+Build Artifact 只包含 `kernel.so`，不包含 Python 或其他动态库。基础 Linux ABI 使用严格 allowlist；Kernel 与 TVM-FFI 共享进程中同一份动态 `libstdc++.so.6`/`libgcc_s.so.1`，Build config 记录并在加载前验证 `GLIBCXX`/`CXXABI` 要求。Kernel 在 `build.nix` 声明逻辑 Host CUDA Dependency，k-dash 按 CUDA Target 解析 SONAME ABI major，例如 CUDA 12/13 的 cuBLAS 可以分别解析为 `.12`/`.13`；加载按 ABI major 与最低版本验证，不要求精确 patch。
 
 ## OCI distribution
 

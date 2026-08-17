@@ -33,4 +33,4 @@ Superseded ADRs in the v1 discussion:
 - ADR-0032 → ADR-0033
 - ADR-0034 → ADR-0039
 
-Current implementation/scope decisions end at ADR-0055.
+Current implementation/scope decisions end at ADR-0057.

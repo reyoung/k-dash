@@ -1,0 +1,10 @@
+.git
+.venv
+ref
+docs
+tests
+.pytest_cache
+**/__pycache__
+*.pyc
+.cache-seed.*
+writable-upper*.tar.gz

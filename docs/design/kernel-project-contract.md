@@ -33,23 +33,23 @@ build-api = 1
 
 ```nix
 {
-  kdlib,
   pkgs,
   buildSpec,
 }:
-kdlib.mkTvmFfiKernel {
-  src = ./.;
-  args = buildSpec.args;
-  target = buildSpec.target;
+let
+  # `k-dash init` 在这里内联并冻结构建 helper 及其依赖 hash。
+  mkTvmFfiKernel = /* self-contained helper */;
+in mkTvmFfiKernel {
   hostCudaDependencies = [ ];
-  build = /* kernel-specific derivation */;
+  build = /* kernel-specific derivation from buildSpec */;
 }
 ```
 
 约束：
 
 - `build.nix` 是唯一 Kernel 构建逻辑入口。
-- `flake.nix` 与 `flake.lock` 声明并锁定 `kdlib`、nixpkgs、CUDA 与 DSL inputs。
+- `flake.nix` 与 `flake.lock` 声明并锁定 nixpkgs、CUDA 与 DSL inputs；v1 不存在独立 `kdlib` input。
+- `k-dash init` 把构建 helper 的实现和固定依赖 digest 直接写入 `build.nix`。这些 helper 随 Kernel Release 冻结，旧项目不会因 k-dash package 升级而改变构建语义。
 - k-dash 以生成的 Nix expression 传入 BuildSpec，不使用环境变量。
 - Nix evaluation 必须 pure，build 必须 sandboxed。
 - Kernel 自行决定 Args/Target 到语言静态参数的安全转换，禁止未经转义拼接 shell。

@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
+
+WORKDIR /workspace
+
+RUN python -m pip install --no-cache-dir apache-tvm-ffi==0.1.13.post3
+
+COPY pyproject.toml README.md /workspace/
+COPY src /workspace/src
+COPY examples/axpy /workspace/examples/axpy
+COPY .cache-seed/ /opt/k-dash-cache/
+
+RUN python -m pip install --no-cache-dir /workspace && \
+    printf '%s\n' \
+      'schema_version: 1' \
+      'registries:' \
+      '  - name: offline' \
+      '    url: https://registry.invalid' \
+      '    repository_prefix: offline' \
+      '    primary: true' \
+      '    verify_tls: true' \
+      '    auth: {type: anonymous}' \
+      > /etc/k-dash.yaml
+
+ENV K_DASH_OFFLINE=1 \
+    K_DASH_CACHE_DIR=/opt/k-dash-cache \
+    K_DASH_CONFIG=/etc/k-dash.yaml \
+    K_DASH_AXPY_VERSION=2
+
+CMD ["python", "/workspace/examples/axpy/run.py"]
