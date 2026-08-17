@@ -27,6 +27,13 @@ def _driver_expression(source: Path, spec: BuildSpec, system: str) -> str:
     builtins.unsafeDiscardStringContext ("path:" + toString source)
   );
   system = {json.dumps(system)};
+  hasCuteDsl = builtins.hasAttr "cutedsl-toolchain" flake.inputs;
+  cuteDslOverlays =
+    if hasCuteDsl then [
+      (import ((builtins.getAttr "cutedsl-toolchain" flake.inputs) + "/nix-builder/overlay.nix") {{
+        builderProvenance = null;
+      }})
+    ] else [ ];
   basePkgs = import flake.inputs.nixpkgs {{
     inherit system;
     config.allowUnfree = true;
@@ -34,10 +41,13 @@ def _driver_expression(source: Path, spec: BuildSpec, system: str) -> str:
   cudaPkgs = import flake.inputs.cuda-nixpkgs {{
     inherit system;
     config.allowUnfree = true;
+    overlays = cuteDslOverlays;
   }};
   pkgs = basePkgs // {{
     cudaPackages_12_8 = cudaPkgs.cudaPackages_12_8;
-  }};
+  }} // (if hasCuteDsl then {{
+    cutePythonEnv = cudaPkgs.python313.withPackages (ps: [ ps.nvidia-cutlass-dsl ]);
+  }} else {{ }});
   buildSpec = builtins.fromJSON {json.dumps(canonical_json(spec.as_dict()).decode())};
 in import (source + "/build.nix") {{ inherit pkgs buildSpec; }}
 '''

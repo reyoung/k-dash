@@ -62,6 +62,43 @@ void copy_cuda(ffi::TensorView out, ffi::TensorView x) {
 TVM_FFI_DLL_EXPORT_TYPED_FUNC(copy_cuda, copy_cuda);
 '''
 
+CUTEDSL_SOURCE = r'''from __future__ import annotations
+
+import sys
+
+import cutlass
+import cutlass.cute as cute
+from cutlass.cute.runtime import make_fake_compact_tensor
+
+
+@cute.kernel
+def copy_kernel(x: cute.Tensor, out: cute.Tensor):
+    for index in range(x.shape[0]):
+        out[index] = x[index]
+
+
+@cute.jit
+def copy_cuda(x: cute.Tensor, out: cute.Tensor):
+    copy_kernel(x, out).launch(grid=(1, 1, 1), block=(1, 1, 1))
+
+
+def main() -> None:
+    object_path, arch, elements = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    x = make_fake_compact_tensor(cutlass.Float32, (elements,))
+    out = make_fake_compact_tensor(cutlass.Float32, (elements,))
+    compiled = cute.compile(
+        copy_cuda,
+        x,
+        out,
+        options=f"--enable-tvm-ffi --gpu-arch={arch}",
+    )
+    compiled.export_to_c(object_path, function_name="copy_cuda")
+
+
+if __name__ == "__main__":
+    main()
+'''
+
 def init_project(name: str, destination: Path, template: str, license_value: str | None) -> Path:
     validate_kernel_name(name)
     if template not in {"cpp", "cutedsl"}:
@@ -76,7 +113,9 @@ def init_project(name: str, destination: Path, template: str, license_value: str
         files["src/kernel.cu"] = CPP_SOURCE
     else:
         files["build.nix"] = resources.files("k_dash").joinpath("template_data/cutedsl-build.nix").read_text()
-        files["src/kernel.py"] = "# CuteDSL AOT source; build.nix owns lowering to TVM-FFI.\n"
+        files["flake.nix"] = resources.files("k_dash").joinpath("template_data/cutedsl-flake.nix").read_text()
+        files["flake.lock"] = resources.files("k_dash").joinpath("template_data/cutedsl-flake.lock").read_text()
+        files["src/kernel.py"] = CUTEDSL_SOURCE
     for relative, content in files.items():
         path = destination / relative
         path.parent.mkdir(parents=True, exist_ok=True)

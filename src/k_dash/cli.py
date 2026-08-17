@@ -90,7 +90,18 @@ def _run(args: argparse.Namespace) -> Any:
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,
             args_files=args.args, builder_image=args.builder_image,
         )
-        return {"builds": [{"build_key": key, "path": str(path), "cache_hit": hit} for key, path, hit in results]}
+        return {
+            "builds": [
+                {
+                    "build_key": key,
+                    "release_digest": release_digest,
+                    "path": str(path),
+                    "cache_hit": hit,
+                    "provenance": provenance,
+                }
+                for key, path, hit, release_digest, provenance in results
+            ]
+        }
     if args.command == "publish":
         return publish_release(
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,

@@ -14,7 +14,7 @@ from .errors import ContractError, OfflineCacheMiss
 from .project import validate_kernel_name
 from .runtime import materialize, pull_release, resolve_release
 from .target import detect_target
-from .validation import validate_host_cxx_runtime
+from .validation import validate_host_cxx_runtime, validate_host_dependencies, validate_tvm_ffi_runtime
 
 _modules: dict[str, Any] = {}
 _module_locks: dict[str, threading.Lock] = {}
@@ -56,6 +56,8 @@ def load(kernel: str, *, jit_args: Mapping[str, Any] | None = None, version: str
             import tvm_ffi
 
             build_config = json.loads(module_path.with_name("config.json").read_text())
+            validate_tvm_ffi_runtime(build_config, tvm_ffi.__version__)
+            validate_host_dependencies(build_config)
             validate_host_cxx_runtime(build_config)
             _modules[key] = tvm_ffi.load_module(module_path)
         return _modules[key]

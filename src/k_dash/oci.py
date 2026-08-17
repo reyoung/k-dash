@@ -6,6 +6,8 @@ import base64
 import json
 import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -63,6 +65,40 @@ class OCIClient:
             ) from error
         host = urlparse(config.url).netloc
         auths = docker_config.get("auths", {})
+        helper = (docker_config.get("credHelpers") or {}).get(host) or docker_config.get("credsStore")
+        if helper:
+            executable = shutil.which(f"docker-credential-{helper}")
+            if executable is None:
+                raise RegistryAccessFailure(
+                    "Docker credential helper is unavailable",
+                    stage="registry-auth",
+                    context={"registry": config.name, "helper": helper},
+                )
+            try:
+                result = subprocess.run(
+                    [executable, "get"],
+                    input=host + "\n",
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=10,
+                )
+                credential = json.loads(result.stdout)
+                username = credential["Username"]
+                password = credential["Secret"]
+            except (subprocess.SubprocessError, json.JSONDecodeError, KeyError) as error:
+                raise RegistryAccessFailure(
+                    "Docker credential helper failed",
+                    stage="registry-auth",
+                    context={"registry": config.name, "helper": helper},
+                ) from error
+            if not isinstance(username, str) or not isinstance(password, str):
+                raise RegistryAccessFailure(
+                    "Docker credential helper returned invalid credentials",
+                    stage="registry-auth",
+                    context={"registry": config.name, "helper": helper},
+                )
+            return username, password
         encoded = None
         for key in (host, f"https://{host}", f"http://{host}"):
             if isinstance(auths.get(key), dict) and auths[key].get("auth"):

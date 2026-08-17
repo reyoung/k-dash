@@ -43,6 +43,19 @@ def test_init_refuses_nonempty_directory(tmp_path: Path) -> None:
     assert (root / "mine.txt").read_text() == "preserve"
 
 
+def test_cutedsl_init_is_a_real_locked_aot_project(tmp_path: Path) -> None:
+    root = tmp_path / "cutedsl"
+    init_project("owner/cutedsl", root, "cutedsl", None)
+    build_nix = (root / "build.nix").read_text()
+    source = (root / "src/kernel.py").read_text()
+    flake = (root / "flake.nix").read_text()
+    assert "cutedslModule" in build_nix
+    assert '"cutedsl-runtime"' in build_nix
+    assert "not yet implemented" not in build_nix
+    assert "@cute.kernel" in source and "export_to_c" in source
+    assert "cutedsl-toolchain" in flake
+
+
 def test_required_file_cannot_be_ignored(tmp_path: Path) -> None:
     root = tmp_path / "kernel"
     init_project("owner/kernel", root, "cpp", None)

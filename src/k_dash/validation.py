@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import ctypes
+import importlib.metadata
 import re
 import warnings
 from pathlib import PurePosixPath
@@ -36,7 +37,14 @@ CUDA_SONAMES = {
     "libcublas.so.12": "cublas",
     "libcublas.so.13": "cublas",
     "libnccl.so.2": "nccl",
+    "libcute_dsl_runtime.so": "cutedsl-runtime",
 }
+
+DEPENDENCY_MIN_VERSIONS = {
+    "cutedsl-runtime": "4.6.1",
+}
+
+_HOST_LIBRARY_HANDLES: dict[str, ctypes.CDLL] = {}
 
 
 def dynamic_dependencies(payload: bytes) -> set[str]:
@@ -52,7 +60,11 @@ def dynamic_dependencies(payload: bytes) -> set[str]:
 
 def infer_host_dependencies(payload: bytes) -> list[dict[str, str]]:
     return [
-        {"name": CUDA_SONAMES[soname], "soname": soname, "min_version": "0"}
+        {
+            "name": CUDA_SONAMES[soname],
+            "soname": soname,
+            "min_version": DEPENDENCY_MIN_VERSIONS.get(CUDA_SONAMES[soname], "0"),
+        }
         for soname in sorted(dynamic_dependencies(payload))
         if soname in CUDA_SONAMES
     ]
@@ -226,3 +238,69 @@ def validate_host_cxx_runtime(config: dict[str, Any]) -> None:
                 stage="runtime-dependencies",
                 context={"required": required, "available": available, "path": str(library)},
             )
+
+
+def _package_version_tuple(value: str) -> tuple[int, ...]:
+    match = re.match(r"\d+(?:\.\d+)*", value)
+    return tuple(int(part) for part in match.group(0).split(".")) if match else ()
+
+
+def validate_host_dependencies(config: dict[str, Any]) -> None:
+    for requirement in config.get("host_dependencies", []):
+        name = requirement.get("name")
+        soname = requirement.get("soname")
+        if name == "cutedsl-runtime":
+            try:
+                installed = importlib.metadata.version("nvidia-cutlass-dsl")
+            except importlib.metadata.PackageNotFoundError as error:
+                raise ArtifactIntegrityError(
+                    "CuteDSL runtime package is unavailable",
+                    stage="runtime-dependencies",
+                    context={"package": "nvidia-cutlass-dsl"},
+                ) from error
+            minimum = requirement.get("min_version", "0")
+            if _package_version_tuple(installed) < _package_version_tuple(minimum):
+                raise ArtifactIntegrityError(
+                    "CuteDSL runtime package is too old",
+                    stage="runtime-dependencies",
+                    context={"required": minimum, "installed": installed},
+                )
+            try:
+                import cutlass.runtime
+
+                candidates = cutlass.runtime.find_runtime_libraries(enable_tvm_ffi=False)
+                runtime = next(path for path in candidates if Path(path).name == soname)
+                if runtime not in _HOST_LIBRARY_HANDLES:
+                    _HOST_LIBRARY_HANDLES[runtime] = ctypes.CDLL(
+                        runtime,
+                        mode=ctypes.RTLD_GLOBAL,
+                    )
+            except (ImportError, OSError, StopIteration) as error:
+                raise ArtifactIntegrityError(
+                    "CuteDSL native runtime library is unavailable",
+                    stage="runtime-dependencies",
+                    context={"soname": soname},
+                ) from error
+        elif isinstance(soname, str):
+            try:
+                if soname not in _HOST_LIBRARY_HANDLES:
+                    _HOST_LIBRARY_HANDLES[soname] = ctypes.CDLL(
+                        soname,
+                        mode=ctypes.RTLD_GLOBAL,
+                    )
+            except OSError as error:
+                raise ArtifactIntegrityError(
+                    "required host dependency is unavailable",
+                    stage="runtime-dependencies",
+                    context={"name": name, "soname": soname},
+                ) from error
+
+
+def validate_tvm_ffi_runtime(config: dict[str, Any], installed_version: str) -> None:
+    required = config.get("buildspec", {}).get("target", {}).get("tvm_ffi")
+    if required != installed_version:
+        raise ArtifactIntegrityError(
+            "TVM-FFI runtime version does not match TargetSpec",
+            stage="runtime-dependencies",
+            context={"required": required, "installed": installed_version},
+        )

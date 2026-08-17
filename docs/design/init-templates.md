@@ -44,7 +44,7 @@ Template 随 k-dash 版本携带固定的 `flake.lock`，初始化不要求 GPU�
 
 ### `cutedsl`
 
-生成最小 CuteDSL kernel、AOT TVM-FFI export 和固定 CuteDSL 工具链的 Nix inputs，最终仍输出单个 `kernel.so`。
+生成最小 CuteDSL kernel、AOT TVM-FFI export 和固定 CuteDSL 工具链的 Nix inputs，最终仍输出单个 `kernel.so`。v1 模板锁定 `nvidia-cutlass-dsl==4.6.1` 与 `apache-tvm-ffi==0.1.13.post3`；AOT 使用官方 `cute.compile(..., options="--enable-tvm-ffi")` 和 `export_to_c()`。产物声明 `cutedsl-runtime`，loader 从已安装的同版本 Python package 定位并预加载 `libcute_dsl_runtime.so`，Artifact 本身不打包该 runtime。
 
 ### Future `triton`
 

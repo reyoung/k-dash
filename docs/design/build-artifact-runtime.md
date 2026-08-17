@@ -34,6 +34,8 @@ librt.so.1
 
 `libstdc++.so.6` 和 `libgcc_s.so.1` 是 TVM-FFI Framework Runtime Dependency。Kernel 必须动态链接并复用进程中 TVM-FFI 已加载的同一份 runtime，不能在 Artifact 中打包另一份，也不能通过 RPATH 指向私有副本。Build config 记录 Kernel 实际需要的最高 `GLIBCXX`/`CXXABI` symbol version；加载前对进程实际映射的 `libstdc++.so.6` 执行版本预检。基础 ABI 之外，`DT_NEEDED` 只能引用 k-dash 内建清单认可且由 Kernel 显式声明的 Host CUDA Dependency，例如 CUDA Driver、CUDA Runtime、cuBLAS 和 NCCL。
 
+CuteDSL AOT Module 可以声明逻辑依赖 `cutedsl-runtime`。v1 将它解析为 `nvidia-cutlass-dsl>=4.6.1` package 提供的 `libcute_dsl_runtime.so`；loader 在加载 Kernel 前通过官方 `cutlass.runtime.find_runtime_libraries()` 定位并以 global scope 预加载。该 runtime 不进入 Artifact、不使用 RPATH，且自身必须满足 manylinux baseline。
+
 Kernel 在 `build.nix` 声明逻辑依赖名，k-dash 按 TargetSpec 的 CUDA Toolkit Version 解析实际 SONAME ABI major；例如 `cublas` 可以在 CUDA 12 与 CUDA 13 分别解析为 `libcublas.so.12` 与 `libcublas.so.13`。发布时逻辑声明和实际 `DT_NEEDED` 必须完全一致。
 
 Build Artifact config 对每项依赖记录：

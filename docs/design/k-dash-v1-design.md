@@ -17,6 +17,8 @@ v1 支持：
 - macOS/Linux 上通过 Docker 执行无 GPU AOT build。
 - C++ 与 CuteDSL project template。
 - 单个 TVM-FFI `kernel.so`，无 Python glue。
+
+CuteDSL template 固定 `nvidia-cutlass-dsl==4.6.1`，通过官方 AOT export 生成单一 TVM-FFI Module；其 `libcute_dsl_runtime.so` 作为受版本约束的 Framework Runtime Dependency 由 loader 在 `dlopen(kernel.so)` 前定位和预加载，不进入 Build Artifact。
 - 多 Registry 发布与 Primary-first load failover。
 - 不可变 Release、可追加 Materialized Build 和可移动 `dev-*` Version。
 

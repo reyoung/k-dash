@@ -65,6 +65,18 @@ def load_registry_set(path: Path | None = None) -> RegistrySet:
         auth = entry.get("auth", {"type": "anonymous"})
         if not isinstance(auth, dict) or auth.get("type") not in {"anonymous", "basic", "docker"}:
             raise ContractError("unsupported registry auth", stage="registry-config", context={"name": name})
+        auth_fields = {
+            "anonymous": {"type"},
+            "basic": {"type", "username", "password", "username_env", "password_env"},
+            "docker": {"type", "config_path"},
+        }[auth["type"]]
+        auth_unknown = set(auth) - auth_fields
+        if auth_unknown:
+            raise ContractError(
+                "unknown registry auth fields",
+                stage="registry-config",
+                context={"name": name, "fields": sorted(auth_unknown)},
+            )
         registries.append(
             RegistryConfig(
                 name=name,

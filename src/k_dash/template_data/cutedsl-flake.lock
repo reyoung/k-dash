@@ -1,0 +1,52 @@
+{
+  "nodes": {
+    "cuda-nixpkgs": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1782847189,
+        "narHash": "sha256-twXPFqFsrrY5r28Zh7Homgcp2gUMBgQ6WDS98Q/3xFI=",
+        "type": "tarball",
+        "url": "https://codeload.github.com/NixOS/nixpkgs/tar.gz/b6018f87da91d19d0ab4cf979885689b469cdd41"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://codeload.github.com/NixOS/nixpkgs/tar.gz/b6018f87da91d19d0ab4cf979885689b469cdd41"
+      }
+    },
+    "cutedsl-toolchain": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786749308,
+        "narHash": "sha256-swO3DCvhxSqdrjS6FWM4wWthR7FyqlPoaFvZPi0tVVs=",
+        "type": "tarball",
+        "url": "https://codeload.github.com/huggingface/kernels/tar.gz/b5443818ffe69a740095bb1174ca55e7fbb34c00"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://codeload.github.com/huggingface/kernels/tar.gz/b5443818ffe69a740095bb1174ca55e7fbb34c00"
+      }
+    },
+    "nixpkgs": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1600952148,
+        "narHash": "sha256-GUKHrnng33luc6mUT3rDnZ3Hm+4MMEJpEchRIAQx7JQ=",
+        "type": "tarball",
+        "url": "https://codeload.github.com/NixOS/nixpkgs/tar.gz/75f4ba05c63be3f147bcc2f7bd4ba1f029cedcb1"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://codeload.github.com/NixOS/nixpkgs/tar.gz/75f4ba05c63be3f147bcc2f7bd4ba1f029cedcb1"
+      }
+    },
+    "root": {
+      "inputs": {
+        "cuda-nixpkgs": "cuda-nixpkgs",
+        "cutedsl-toolchain": "cutedsl-toolchain",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

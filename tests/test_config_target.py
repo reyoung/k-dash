@@ -38,6 +38,22 @@ def test_registry_unknown_field_fails(tmp_path: Path) -> None:
         load_registry_set(path)
 
 
+def test_registry_auth_unknown_field_fails(tmp_path: Path) -> None:
+    path = tmp_path / "config.yaml"
+    path.write_text(
+        """schema_version: 1
+registries:
+  - name: primary
+    url: https://registry.example
+    repository_prefix: k-dash
+    primary: true
+    auth: {type: anonymous, password: forbidden}
+"""
+    )
+    with pytest.raises(ContractError, match="unknown registry auth fields"):
+        load_registry_set(path)
+
+
 def test_target_normalization() -> None:
     assert normalize_cuda_version("12.8.1") == "12.8"
     assert normalize_cc("sm_90a") == "sm_90a"

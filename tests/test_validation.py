@@ -150,3 +150,25 @@ def test_non_numeric_cxxabi_feature_tags_are_ignored() -> None:
         {"CXXABI_FLOAT128", "CXXABI_TM_1", "CXXABI_1.3.13"},
         "CXXABI_",
     ) == "CXXABI_1.3.13"
+
+
+def test_cutedsl_runtime_dependency_is_inferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        validation,
+        "ELFFile",
+        lambda _: _Elf([_Tag("DT_NEEDED", "libcute_dsl_runtime.so")]),
+    )
+    assert validation.infer_host_dependencies(b"ELF") == [
+        {
+            "name": "cutedsl-runtime",
+            "soname": "libcute_dsl_runtime.so",
+            "min_version": "4.6.1",
+        }
+    ]
+
+
+def test_tvm_ffi_runtime_version_must_be_exact() -> None:
+    config = {"buildspec": {"target": {"tvm_ffi": "0.1.13.post3"}}}
+    validation.validate_tvm_ffi_runtime(config, "0.1.13.post3")
+    with pytest.raises(ArtifactIntegrityError, match="does not match"):
+        validation.validate_tvm_ffi_runtime(config, "0.1.12")

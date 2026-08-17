@@ -65,14 +65,14 @@ def local_build(
     cc: str,
     args_files: list[Path],
     builder_image: str = DEFAULT_BUILDER_IMAGE,
-) -> list[tuple[str, Path, bool]]:
+) -> list[tuple[str, Path, bool, str, dict[str, Any]]]:
     version = validate_version(version)
     _, schema = load_project(root)
     _, _, _, _, release_digest = _release_payloads(root, version)
     target = explicit_target(cuda, cc)
     args_values = _load_args_files(args_files, schema) if args_files else [normalize_args({}, schema)]
     cache = Cache()
-    results: list[tuple[str, Path, bool]] = []
+    results: list[tuple[str, Path, bool, str, dict[str, Any]]] = []
     seen: set[str] = set()
     for args in args_values:
         spec = BuildSpec(release_digest=release_digest, args=args, target=target.as_dict())
@@ -82,7 +82,7 @@ def local_build(
         seen.add(key)
         cached = cache.get_build(key)
         if cached:
-            results.append((key, cached[1], True))
+            results.append((key, cached[1], True, release_digest, cached[0].get("provenance", {})))
             continue
         kernel_so, provenance = docker_aot(root, spec, builder_image=builder_image)
         config, _, _, _, _ = build_objects(
@@ -94,7 +94,7 @@ def local_build(
         )
         validate_kernel_so(kernel_so, config)
         destination = cache.commit_build(key, config, kernel_so)
-        results.append((key, destination / "kernel.so", False))
+        results.append((key, destination / "kernel.so", False, release_digest, provenance))
     return results
 
 
