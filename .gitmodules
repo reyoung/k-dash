@@ -1,0 +1,3 @@
+[submodule "ref/kernels"]
+	path = ref/kernels
+	url = https://github.com/huggingface/kernels.git
