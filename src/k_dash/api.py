@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from .cache import Cache
@@ -21,8 +22,12 @@ _module_locks: dict[str, threading.Lock] = {}
 _guard = threading.Lock()
 
 
-def load(kernel: str, *, jit_args: Mapping[str, Any] | None = None, version: str):
-    """Resolve, materialize, validate and load one TVM-FFI module."""
+def get(kernel: str, *, jit_args: Mapping[str, Any] | None = None, version: str) -> Path:
+    """Resolve, materialize and return the absolute path to ``kernel.so``.
+
+    This is the download-path solver: registry / offline cache lookup, Binary
+    Miss local JIT when needed, then a stable cache path callers can load.
+    """
     validate_kernel_name(kernel)
     if not isinstance(version, str) or not version:
         raise ContractError("version must be a non-empty string", stage="load")
@@ -48,7 +53,16 @@ def load(kernel: str, *, jit_args: Mapping[str, Any] | None = None, version: str
         release_config = cached_release[0]
     args = normalize_args(dict(jit_args or {}), release_config["args_schema"])
     target = detect_target()
-    key, module_path = materialize(registries, authority, kernel, release_digest, args, target, cache)
+    _, module_path = materialize(
+        registries, authority, kernel, release_digest, args, target, cache
+    )
+    return Path(module_path).resolve()
+
+
+def load(kernel: str, *, jit_args: Mapping[str, Any] | None = None, version: str):
+    """Resolve, materialize, validate and load one TVM-FFI module."""
+    module_path = get(kernel, jit_args=jit_args, version=version)
+    key = str(module_path)
     with _guard:
         lock = _module_locks.setdefault(key, threading.Lock())
     with lock:
@@ -59,5 +73,5 @@ def load(kernel: str, *, jit_args: Mapping[str, Any] | None = None, version: str
             validate_tvm_ffi_runtime(build_config, tvm_ffi.__version__)
             validate_host_dependencies(build_config)
             validate_host_cxx_runtime(build_config)
-            _modules[key] = tvm_ffi.load_module(module_path)
+            _modules[key] = tvm_ffi.load_module(str(module_path))
         return _modules[key]

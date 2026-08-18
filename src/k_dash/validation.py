@@ -131,7 +131,17 @@ def validate_build_config(config: dict[str, Any], expected_key: str, expected_re
         raise ArtifactIntegrityError("Release digest mismatch", stage="build-validation")
 
 
-def validate_kernel_so(payload: bytes, config: dict[str, Any]) -> None:
+def validate_kernel_so(
+    payload: bytes, config: dict[str, Any], *, enforce_baseline: bool = True
+) -> None:
+    """Validate a ``kernel.so`` against its build config.
+
+    ``enforce_baseline=False`` skips only the GLIBC/GLIBCXX/CXXABI portability
+    ceiling. It exists for host-toolchain artifacts seeded into a local dev
+    cache, which are never distributed; anything that publishes or pulls must
+    keep the default.
+    """
+
     if digest_bytes(payload) != config.get("kernel_so_digest"):
         raise ArtifactIntegrityError("kernel.so digest mismatch", stage="elf-validation")
     try:
@@ -165,9 +175,10 @@ def validate_kernel_so(payload: bytes, config: dict[str, Any]) -> None:
     if unexpected:
         raise ArtifactIntegrityError("undeclared dynamic dependencies", stage="elf-validation", context={"needed": sorted(unexpected)})
     versions = elf_required_versions(payload)
-    _check_maximum(versions["glibc"], MAX_GLIBC, "GLIBC")
-    _check_maximum(versions["glibcxx"], MAX_GLIBCXX, "GLIBCXX")
-    _check_maximum(versions["cxxabi"], MAX_CXXABI, "CXXABI")
+    if enforce_baseline:
+        _check_maximum(versions["glibc"], MAX_GLIBC, "GLIBC")
+        _check_maximum(versions["glibcxx"], MAX_GLIBCXX, "GLIBCXX")
+        _check_maximum(versions["cxxabi"], MAX_CXXABI, "CXXABI")
     inferred_cxx = cxx_runtime_requirement(payload)
     recorded_cxx = config.get("cxx_runtime")
     if inferred_cxx != recorded_cxx:

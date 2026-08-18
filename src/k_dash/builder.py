@@ -138,7 +138,10 @@ def docker_aot(
                 if not container.put_archive("/tmp", stream):
                     raise KDashError("failed to stream source into builder", stage="docker-aot")
             container.start()
-            status = container.wait(timeout=1800)
+            # A cold /nix volume has to fetch and unpack the whole CUDA
+            # toolchain before it ever reaches nvcc, which outlasts any timeout
+            # that is reasonable once the store is warm.
+            status = container.wait(timeout=int(os.environ.get("K_DASH_AOT_TIMEOUT", "1800")))
             if status.get("StatusCode") != 0:
                 log = container.logs(stdout=True, stderr=True, tail=80).decode(errors="replace")
                 raise KDashError("Docker AOT failed", stage="docker-aot", context={"log": log})
