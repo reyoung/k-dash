@@ -171,6 +171,25 @@ def test_cutedsl_runtime_dependency_is_inferred(monkeypatch: pytest.MonkeyPatch)
     ]
 
 
+def test_cublas_and_cublaslt_dependencies_are_inferred(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        validation,
+        "ELFFile",
+        lambda _: _Elf(
+            [
+                _Tag("DT_NEEDED", "libcublas.so.13"),
+                _Tag("DT_NEEDED", "libcublasLt.so.13"),
+            ]
+        ),
+    )
+    assert validation.infer_host_dependencies(b"ELF") == [
+        {"name": "cublas", "soname": "libcublas.so.13", "min_version": "0"},
+        {"name": "cublas", "soname": "libcublasLt.so.13", "min_version": "0"},
+    ]
+
+
 def test_tvm_ffi_runtime_version_must_be_exact() -> None:
     config = {"buildspec": {"target": {"tvm_ffi": "0.1.13.post3"}}}
     validation.validate_tvm_ffi_runtime(config, "0.1.13.post3")

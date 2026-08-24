@@ -36,6 +36,11 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--cc", required=True)
     build.add_argument("--args", action="append", default=[], type=_path)
     build.add_argument("--builder-image", default=DEFAULT_BUILDER_IMAGE)
+    build.add_argument(
+        "--local-jit",
+        action="store_true",
+        help="build with the host Nix daemon instead of a Docker builder",
+    )
 
     publish = subcommands.add_parser("publish", help="publish source and optional AOT builds")
     publish.add_argument("--version", required=True)
@@ -89,6 +94,7 @@ def _run(args: argparse.Namespace) -> Any:
         results = local_build(
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,
             args_files=args.args, builder_image=args.builder_image,
+            use_local_jit=args.local_jit,
         )
         return {
             "builds": [

@@ -3,18 +3,24 @@
 from __future__ import annotations
 
 import re
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from .artifact import BUILD_TYPE, RELEASE_TYPE, build_objects, extract_binary_archive, parse_json_blob
-from .builder import DEFAULT_BUILDER_IMAGE, docker_aot
+from .builder import DEFAULT_BUILDER_IMAGE, docker_aot, local_jit
 from .cache import Cache
 from .canonical import build_key, build_tag, canonical_json, loads_no_duplicates, normalize_args
 from .config import load_registry_set
 from .errors import ArtifactIntegrityError, ArtifactNotFound, ContractError
 from .model import BuildSpec, RegistryConfig, TargetSpec
 from .oci import OCIClient
-from .project import extract_source_archive, load_project, release_objects
+from .project import (
+    extract_source_archive,
+    load_project,
+    materialize_source_tree,
+    release_objects,
+)
 from .runtime import pull_release, resolve_release
 from .target import explicit_target
 from .validation import cxx_runtime_requirement, infer_host_dependencies, validate_kernel_so
@@ -65,6 +71,7 @@ def local_build(
     cc: str,
     args_files: list[Path],
     builder_image: str = DEFAULT_BUILDER_IMAGE,
+    use_local_jit: bool = False,
 ) -> list[tuple[str, Path, bool, str, dict[str, Any]]]:
     version = validate_version(version)
     _, schema = load_project(root)
@@ -84,7 +91,15 @@ def local_build(
         if cached:
             results.append((key, cached[1], True, release_digest, cached[0].get("provenance", {})))
             continue
-        kernel_so, provenance = docker_aot(root, spec, builder_image=builder_image)
+        if use_local_jit:
+            with tempfile.TemporaryDirectory(prefix="k-dash-local-build-") as temporary:
+                source = Path(temporary) / "source"
+                materialize_source_tree(root, source)
+                kernel_so, provenance = local_jit(source, spec)
+        else:
+            kernel_so, provenance = docker_aot(
+                root, spec, builder_image=builder_image
+            )
         config, _, _, _, _ = build_objects(
             spec,
             kernel_so,

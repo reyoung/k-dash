@@ -60,6 +60,7 @@ registries:
 def test_target_normalization() -> None:
     assert normalize_cuda_version("12.8.1") == "12.8"
     assert normalize_cc("sm_90a") == "sm_90a"
+    assert normalize_cc("sm_100a") == "sm_100a"
     with pytest.raises(ContractError):
         normalize_cc("sm_90")
 

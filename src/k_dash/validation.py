@@ -36,6 +36,8 @@ CUDA_SONAMES = {
     "libcudart.so.13": "cuda-runtime",
     "libcublas.so.12": "cublas",
     "libcublas.so.13": "cublas",
+    "libcublasLt.so.12": "cublas",
+    "libcublasLt.so.13": "cublas",
     "libnccl.so.2": "nccl",
     "libcute_dsl_runtime.so": "cutedsl-runtime",
 }

@@ -28,6 +28,7 @@ def _driver_expression(source: Path, spec: BuildSpec, system: str) -> str:
   );
   system = {json.dumps(system)};
   hasCuteDsl = builtins.hasAttr "cutedsl-toolchain" flake.inputs;
+  hasCompatNixpkgs = builtins.hasAttr "compat-nixpkgs" flake.inputs;
   cuteDslOverlays =
     if hasCuteDsl then [
       (import ((builtins.getAttr "cutedsl-toolchain" flake.inputs) + "/nix-builder/overlay.nix") {{
@@ -43,9 +44,28 @@ def _driver_expression(source: Path, spec: BuildSpec, system: str) -> str:
     config.allowUnfree = true;
     overlays = cuteDslOverlays;
   }};
+  compatPkgs = if hasCompatNixpkgs then
+    import flake.inputs.compat-nixpkgs {{
+      inherit system;
+      config.allowUnfree = true;
+    }}
+  else basePkgs;
+  manylinuxHostCc = if hasCompatNixpkgs then
+    basePkgs.wrapCCWith {{
+      cc = compatPkgs.gcc11.cc;
+      bintools = basePkgs.stdenv.cc.bintools;
+      libc = basePkgs.glibc;
+    }}
+  else basePkgs.stdenv.cc;
   pkgs = basePkgs // {{
     cudaPackages_12_8 = cudaPkgs.cudaPackages_12_8;
-  }} // (if hasCuteDsl then {{
+    # GCC 11 supplies the compiler and C++ headers.  The wrapper supplies the
+    # base pin's glibc 2.27 headers, CRT and linker paths; kernel build.nix can
+    # then select a compatible dynamic libstdc++/libgcc at final link time.
+    manylinuxHostStdenv = basePkgs.overrideCC basePkgs.stdenv manylinuxHostCc;
+  }} // (if builtins.hasAttr "cudaPackages_13" cudaPkgs then {{
+    cudaPackages_13 = cudaPkgs.cudaPackages_13;
+  }} else {{ }}) // (if hasCuteDsl then {{
     cutePythonEnv = cudaPkgs.python313.withPackages (ps: [ ps.nvidia-cutlass-dsl ]);
   }} else {{ }});
   buildSpec = builtins.fromJSON {json.dumps(canonical_json(spec.as_dict()).decode())};
@@ -88,7 +108,11 @@ def local_jit(source: Path, spec: BuildSpec) -> tuple[bytes, dict[str, Any]]:
                 timeout=timeout,
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-            raise KDashError("Nix Local JIT failed", stage="local-jit") from error
+            stderr = getattr(error, "stderr", None)
+            context = {"stderr": stderr[-4000:]} if stderr else None
+            raise KDashError(
+                "Nix Local JIT failed", stage="local-jit", context=context
+            ) from error
         output = Path(result.stdout.strip().splitlines()[-1])
         module = output / "kernel.so"
         if not module.is_file() or any(path.name != "kernel.so" for path in output.iterdir()):

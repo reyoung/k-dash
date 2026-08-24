@@ -19,7 +19,7 @@ def normalize_cuda_version(value: str) -> str:
 
 
 def normalize_cc(value: str) -> str:
-    match = re.fullmatch(r"sm_(\d)(\d)([a-z]?)", value)
+    match = re.fullmatch(r"sm_(\d+)(\d)([a-z]?)", value)
     if not match:
         raise ContractError("CC must look like sm_90a", stage="target", context={"cc": value})
     major, minor, suffix = int(match.group(1)), int(match.group(2)), match.group(3)
