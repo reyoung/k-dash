@@ -25,3 +25,24 @@ def test_docker_builder_bounds_nofile_before_start(tmp_path, monkeypatch):
     spec = BuildSpec('sha256:' + '0' * 64, {}, TargetSpec('linux', 'x86_64', '13.0', 'sm_90a').as_dict())
     with pytest.raises(ContainerCreated):
         docker_aot(root, spec)
+
+
+def test_nix_aot_does_not_forward_registry_credentials(tmp_path, monkeypatch):
+    from k_dash.builder import nix_aot
+    import subprocess
+    monkeypatch.setenv("REGISTRY_PASSWORD", "secret")
+    monkeypatch.setenv("DOCKER_CONFIG", "/private/docker")
+    monkeypatch.setattr("k_dash.builder.shutil.which", lambda _: "/usr/bin/nix")
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "kernel.so").write_bytes(b"ELF")
+    def run(command, **kwargs):
+        assert "REGISTRY_PASSWORD" not in kwargs["env"]
+        assert "DOCKER_CONFIG" not in kwargs["env"]
+        assert "sandbox = false" in kwargs["env"]["NIX_CONFIG"]
+        return subprocess.CompletedProcess(command, 0, str(output) + "\n")
+    monkeypatch.setattr("k_dash.builder.subprocess.run", run)
+    spec = BuildSpec('sha256:' + '0' * 64, {}, TargetSpec('linux', 'x86_64', '13.0', 'sm_90a').as_dict())
+    data, provenance = nix_aot(tmp_path, spec)
+    assert data == b"ELF"
+    assert provenance["mode"] == "nix-aot"

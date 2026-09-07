@@ -122,6 +122,34 @@ def local_jit(source: Path, spec: BuildSpec) -> tuple[bytes, dict[str, Any]]:
         return module.read_bytes(), {"mode": "local-jit", "nix_output": output.name}
 
 
+def nix_aot(source: Path, spec: BuildSpec) -> tuple[bytes, dict[str, Any]]:
+    """Build inside an already isolated CI container without nested namespaces."""
+    if shutil.which("nix") is None:
+        raise KDashError("Nix is unavailable", stage="nix-aot")
+    with tempfile.TemporaryDirectory(prefix="k-dash-nix-aot-") as temporary:
+        driver = Path(temporary) / "driver.nix"
+        driver.write_text(_driver_expression(source.resolve(), spec, _nix_system(spec)))
+        environment = {
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": temporary,
+            "NIX_CONFIG": "experimental-features = nix-command flakes\nsandbox = false\npure-eval = true\nbuild-users-group =\nfilter-syscalls = false",
+        }
+        try:
+            result = subprocess.run(
+                ["nix", "build", "--no-link", "--print-out-paths", "--max-jobs",
+                 os.environ.get("K_DASH_NIX_MAX_JOBS", "auto"), "--file", str(driver)],
+                check=True, stdout=subprocess.PIPE, text=True, env=environment,
+                timeout=int(os.environ.get("K_DASH_AOT_TIMEOUT", "1800")),
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            raise KDashError("Nix AOT failed", stage="nix-aot") from error
+        output = Path(result.stdout.strip().splitlines()[-1])
+        module = output / "kernel.so"
+        if not module.is_file() or any(path.name != "kernel.so" for path in output.iterdir()):
+            raise ContractError("build output must contain only kernel.so", stage="nix-aot")
+        return module.read_bytes(), {"mode": "nix-aot", "nix_output": output.name}
+
+
 def docker_aot(
     source: Path,
     spec: BuildSpec,

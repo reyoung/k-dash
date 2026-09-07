@@ -51,6 +51,8 @@ def _parser() -> argparse.ArgumentParser:
     publish.add_argument("--aot-args", action="append", default=[], type=_path)
     publish.add_argument("--builder-image", default=DEFAULT_BUILDER_IMAGE)
     publish.add_argument("--tvm-ffi-version", default=DEFAULT_TVM_FFI_VERSION)
+    publish.add_argument("--backend", choices=["docker", "nix"], default="docker",
+                         help="nix requires an already isolated CI container (Nix sandbox disabled)")
 
     addition = subcommands.add_parser("publish-build", help="append a build from published source")
     addition.add_argument("--version", required=True)
@@ -116,6 +118,7 @@ def _run(args: argparse.Namespace) -> Any:
         return publish_release(
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,
             args_files=args.aot_args, builder_image=args.builder_image, tvm_ffi=args.tvm_ffi_version,
+            backend=args.backend,
         )
     if args.command == "publish-build":
         return publish_build(

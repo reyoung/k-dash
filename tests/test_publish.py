@@ -147,7 +147,8 @@ def test_publish_failure_prevents_upload(tmp_path, monkeypatch, failure_stage):
     assert calls == expected[:expected.index(failure_stage) + 1]
 
 
-def test_multiple_cuda_targets_deduplicate_and_build_before_upload(tmp_path, monkeypatch):
+@pytest.mark.parametrize("backend", ["docker", "nix"])
+def test_multiple_cuda_targets_deduplicate_and_build_before_upload(tmp_path, monkeypatch, backend):
     from k_dash.templates import init_project
     from k_dash.errors import KDashError
 
@@ -167,13 +168,13 @@ def test_multiple_cuda_targets_deduplicate_and_build_before_upload(tmp_path, mon
         if spec.target['cuda'] == '13.0':
             raise KDashError('second build failed', stage='docker-aot')
         return b'ELF', {}
-    monkeypatch.setattr('k_dash.publish.docker_aot', build)
+    monkeypatch.setattr('k_dash.publish.' + ('docker_aot' if backend == 'docker' else 'nix_aot'), build)
     monkeypatch.setattr('k_dash.publish.build_objects', lambda *_, **kw: ({}, b'{}', b'layer', b'{}', 'sha256:x'))
     monkeypatch.setattr('k_dash.publish.infer_host_dependencies', lambda _: [])
     monkeypatch.setattr('k_dash.publish.cxx_runtime_requirement', lambda _: None)
     monkeypatch.setattr('k_dash.publish.validate_kernel_so', lambda *_: None)
     with pytest.raises(KDashError, match='second build failed'):
-        publish_release(root, version='v0.1.0', cuda=['12.8', '12.8', '13.0'], cc='sm_90a', args_files=[args, args])
+        publish_release(root, version='v0.1.0', cuda=['12.8', '12.8', '13.0'], cc='sm_90a', args_files=[args, args], backend=backend)
     assert [cuda for _, cuda in seen] == ['12.8', '13.0']
     assert len({release for release, _ in seen}) == 1
 

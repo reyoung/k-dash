@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifact import BUILD_TYPE, RELEASE_TYPE, build_objects, extract_binary_archive, parse_json_blob
-from .builder import DEFAULT_BUILDER_IMAGE, docker_aot, local_jit
+from .builder import DEFAULT_BUILDER_IMAGE, docker_aot, local_jit, nix_aot
 from .cache import Cache
 from .canonical import build_key, build_tag, canonical_json, loads_no_duplicates, normalize_args
 from .config import load_registry_set
@@ -123,7 +123,10 @@ def publish_release(
     args_files: list[Path] | None = None,
     builder_image: str = DEFAULT_BUILDER_IMAGE,
     tvm_ffi: str = DEFAULT_TVM_FFI_VERSION,
+    backend: str = "docker",
 ) -> dict[str, Any]:
+    if backend not in {"docker", "nix"}:
+        raise ContractError("unknown AOT backend", stage="publish")
     version = validate_version(version)
     manifest, schema = load_project(root)
     args_files = args_files or []
@@ -155,7 +158,10 @@ def publish_release(
                     if key in seen:
                         continue
                     seen.add(key)
-                    kernel_so, provenance = docker_aot(source, spec, builder_image=builder_image)
+                    if backend == "nix":
+                        kernel_so, provenance = nix_aot(source, spec)
+                    else:
+                        kernel_so, provenance = docker_aot(source, spec, builder_image=builder_image)
                     config, config_bytes, layer, manifest_bytes, digest = build_objects(
                         spec,
                         kernel_so,

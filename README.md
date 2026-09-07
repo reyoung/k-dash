@@ -25,3 +25,10 @@ Source ignore patterns are relative to the project root. Directory patterns such
 as `build`, `build/`, and `build/**` exclude the whole subtree without walking
 it. Existing file globs remain supported; required source files cannot be
 excluded. Symbolic links are not packaged or traversed.
+
+In an already isolated CI container without a Docker daemon, `k-dash publish
+--backend nix ...` builds AOT artifacts directly with installed Nix. This explicit
+backend disables Nix's nested sandbox and build-user group; the CI container must
+provide isolation. It uses the same frozen release source, locked dependencies,
+BuildSpec and binary validation as Docker AOT. Docker remains the default.
+Registry credentials are not forwarded to the Nix build subprocess environment.
