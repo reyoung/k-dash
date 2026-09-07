@@ -13,7 +13,7 @@ from .cache import Cache
 from .canonical import build_key, build_tag, canonical_json, loads_no_duplicates, normalize_args
 from .config import load_registry_set
 from .errors import ArtifactIntegrityError, ArtifactNotFound, ContractError
-from .model import BuildSpec, RegistryConfig, TargetSpec
+from .model import DEFAULT_TVM_FFI_VERSION, BuildSpec, RegistryConfig, TargetSpec
 from .oci import OCIClient
 from .project import (
     extract_source_archive,
@@ -71,12 +71,13 @@ def local_build(
     cc: str,
     args_files: list[Path],
     builder_image: str = DEFAULT_BUILDER_IMAGE,
+    tvm_ffi: str = DEFAULT_TVM_FFI_VERSION,
     use_local_jit: bool = False,
 ) -> list[tuple[str, Path, bool, str, dict[str, Any]]]:
     version = validate_version(version)
     _, schema = load_project(root)
     _, _, _, _, release_digest = _release_payloads(root, version)
-    target = explicit_target(cuda, cc)
+    target = explicit_target(cuda, cc, tvm_ffi=tvm_ffi)
     args_values = _load_args_files(args_files, schema) if args_files else [normalize_args({}, schema)]
     cache = Cache()
     results: list[tuple[str, Path, bool, str, dict[str, Any]]] = []
@@ -117,10 +118,11 @@ def publish_release(
     root: Path,
     *,
     version: str,
-    cuda: str | None = None,
+    cuda: str | list[str] | None = None,
     cc: str | None = None,
     args_files: list[Path] | None = None,
     builder_image: str = DEFAULT_BUILDER_IMAGE,
+    tvm_ffi: str = DEFAULT_TVM_FFI_VERSION,
 ) -> dict[str, Any]:
     version = validate_version(version)
     manifest, schema = load_project(root)
@@ -129,31 +131,41 @@ def publish_release(
         raise ContractError("AOT args require --cuda-version and --cc", stage="publish")
     if not args_files and (cuda is not None or cc is not None):
         raise ContractError("AOT target is invalid without --aot-args", stage="publish")
+    registry_set = load_registry_set()
+    clients = [OCIClient(registry, manifest.name) for registry in registry_set.registries]
     release_config, release_config_bytes, source_layer, release_manifest_bytes, release_digest = _release_payloads(root, version)
 
     materialized: list[tuple[str, bytes, bytes, bytes, str]] = []
     if args_files:
-        target = explicit_target(cuda or "", cc or "")
+        cuda_versions = [cuda] if isinstance(cuda, str) else (cuda or [])
+        if not cuda_versions:
+            raise ContractError("AOT requires at least one CUDA target", stage="publish")
+        targets = [explicit_target(value, cc or "", tvm_ffi=tvm_ffi) for value in cuda_versions]
+        args_values = _load_args_files(args_files, schema)
         seen: set[str] = set()
-        for args in _load_args_files(args_files, schema):
-            spec = BuildSpec(release_digest=release_digest, args=args, target=target.as_dict())
-            key = build_key(spec)
-            if key in seen:
-                continue
-            seen.add(key)
-            kernel_so, provenance = docker_aot(root, spec, builder_image=builder_image)
-            config, config_bytes, layer, manifest_bytes, digest = build_objects(
-                spec,
-                kernel_so,
-                provenance=provenance,
-                host_dependencies=infer_host_dependencies(kernel_so),
-                cxx_runtime=cxx_runtime_requirement(kernel_so),
-            )
-            validate_kernel_so(kernel_so, config)
-            materialized.append((key, config_bytes, layer, manifest_bytes, digest))
+        # Build every target from the exact source layer bound to this Release,
+        # even if the working tree changes while a long build is running.
+        with tempfile.TemporaryDirectory(prefix="k-dash-publish-") as temporary:
+            source = Path(temporary) / "source"
+            extract_source_archive(source_layer, source)
+            for target in targets:
+                for args in args_values:
+                    spec = BuildSpec(release_digest=release_digest, args=args, target=target.as_dict())
+                    key = build_key(spec)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    kernel_so, provenance = docker_aot(source, spec, builder_image=builder_image)
+                    config, config_bytes, layer, manifest_bytes, digest = build_objects(
+                        spec,
+                        kernel_so,
+                        provenance=provenance,
+                        host_dependencies=infer_host_dependencies(kernel_so),
+                        cxx_runtime=cxx_runtime_requirement(kernel_so),
+                    )
+                    validate_kernel_so(kernel_so, config)
+                    materialized.append((key, config_bytes, layer, manifest_bytes, digest))
 
-    registry_set = load_registry_set()
-    clients = [OCIClient(registry, manifest.name) for registry in registry_set.registries]
     for client in clients:
         _check_release_binding(client, version, release_digest)
         for key, _, _, build_manifest, expected in materialized:
@@ -195,6 +207,7 @@ def publish_build(
     cc: str,
     args_file: Path,
     builder_image: str = DEFAULT_BUILDER_IMAGE,
+    tvm_ffi: str = DEFAULT_TVM_FFI_VERSION,
 ) -> dict[str, Any]:
     version = validate_version(version)
     project, _ = load_project(root)
@@ -203,7 +216,7 @@ def publish_build(
     release_digest, authority = resolve_release(registries, project.name, version, cache)
     release = pull_release(authority, project.name, release_digest)
     args = _load_args_files([args_file], release.config["args_schema"])[0]
-    target = explicit_target(cuda, cc)
+    target = explicit_target(cuda, cc, tvm_ffi=tvm_ffi)
     spec = BuildSpec(release_digest=release_digest, args=args, target=target.as_dict())
     key = build_key(spec)
     import tempfile

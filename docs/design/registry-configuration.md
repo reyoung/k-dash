@@ -38,7 +38,7 @@ Registry `name` 必须唯一，必须且只能有一个 Primary。`url` 只包�
 支持以下 auth 类型：
 
 - `anonymous`
-- `docker`，可选 `config_path`，支持 Docker credential helper
+- `docker`，支持 Docker credential helper。凭据文件优先使用显式 `config_path`，其次为非空 `$DOCKER_CONFIG/config.json`，最后为 `~/.docker/config.json`。
 - `basic`，可直接使用 `username`/`password`，也可使用环境变量引用
 
 YAML 允许保存明文 secret。`verify_tls` 默认为 `true`；`ca_bundle` 用于内部 CA；显式 `verify_tls: false` 时每次远端操作产生安全警告。

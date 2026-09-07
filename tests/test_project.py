@@ -62,3 +62,45 @@ def test_required_file_cannot_be_ignored(tmp_path: Path) -> None:
     (root / ".k-dash-ignore").write_text("README.md\n")
     with pytest.raises(ContractError):
         source_archive(root)
+
+
+@pytest.mark.parametrize('pattern', ['build', 'build/', 'build/**', '/build/'])
+def test_ignored_directory_does_not_change_source_digest(tmp_path, pattern):
+    from k_dash.project import source_files
+
+    root = tmp_path / 'kernel'
+    init_project('owner/kernel', root, 'cpp', None)
+    (root / '.k-dash-ignore').write_text(pattern + '\n*.log\n')
+    before = source_archive(root)
+    nested = root / 'build' / 'nested'
+    nested.mkdir(parents=True)
+    (nested / 'kernel.so').write_bytes(b'local build')
+    (root / 'debug.log').write_text('log')
+    assert source_archive(root) == before
+    assert not any(p.relative_to(root).parts[0] == 'build' for p in source_files(root))
+    (root / 'src' / 'build_helpers.cu').write_text('// included')
+    assert source_archive(root) != before
+
+
+def test_directory_exclusion_prunes_walk_and_does_not_follow_symlinks(tmp_path, monkeypatch):
+    import os
+    from k_dash.project import source_files
+
+    root = tmp_path / 'kernel'
+    init_project('owner/kernel', root, 'cpp', None)
+    (root / '.k-dash-ignore').write_text('build/**\n')
+    (root / 'build').mkdir()
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    (outside / 'secret').write_text('excluded')
+    (root / 'link').symlink_to(outside, target_is_directory=True)
+    walk = os.walk
+    visited = []
+    def observing_walk(*args, **kwargs):
+        for entry in walk(*args, **kwargs):
+            visited.append(Path(entry[0]))
+            yield entry
+    monkeypatch.setattr('k_dash.project.os.walk', observing_walk)
+    files = source_files(root)
+    assert root / 'build' not in visited
+    assert not any('link' in p.relative_to(root).parts for p in files)

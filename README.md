@@ -20,3 +20,8 @@ import k_dash
 
 module = k_dash.load("examples/axpy", version="1", jit_args={"block_size": 256})
 ```
+
+Source ignore patterns are relative to the project root. Directory patterns such
+as `build`, `build/`, and `build/**` exclude the whole subtree without walking
+it. Existing file globs remain supported; required source files cannot be
+excluded. Symbolic links are not packaged or traversed.

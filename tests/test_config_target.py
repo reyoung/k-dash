@@ -83,7 +83,9 @@ def test_target_detection_nvcc_wins_and_uses_logical_gpu_zero(monkeypatch) -> No
     monkeypatch.setattr(target, "_nvcc_version", lambda: "12.8")
     monkeypatch.setattr(target.platform, "system", lambda: "Linux")
     monkeypatch.setattr(target.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(target.importlib.metadata, "version", lambda _: "0.1.9")
     detected = target.detect_target()
+    assert detected.tvm_ffi == "0.1.9"
     assert detected.cuda == "12.8" and detected.cc == "sm_100a" and seen == [0]
 
 
@@ -96,5 +98,16 @@ def test_target_detection_falls_back_to_torch_and_uses_sm90a(monkeypatch) -> Non
     monkeypatch.setattr(target, "_nvcc_version", lambda: None)
     monkeypatch.setattr(target.platform, "system", lambda: "Linux")
     monkeypatch.setattr(target.platform, "machine", lambda: "aarch64")
+    monkeypatch.setattr(target.importlib.metadata, "version", lambda _: "0.1.9")
     detected = target.detect_target()
+    assert detected.tvm_ffi == "0.1.9"
     assert detected.cuda == "12.8" and detected.cc == "sm_90a" and detected.arch == "aarch64"
+
+
+def test_explicit_tvm_ffi_version_changes_build_identity():
+    from k_dash.canonical import build_key
+    from k_dash.model import BuildSpec
+    a = target.explicit_target("13.0", "sm_90a", tvm_ffi="0.1.9")
+    b = target.explicit_target("13.0", "sm_90a")
+    assert a.tvm_ffi == "0.1.9" and b.tvm_ffi == "0.1.13.post3"
+    assert build_key(BuildSpec("sha256:" + "0" * 64, {}, a.as_dict())) != build_key(BuildSpec("sha256:" + "0" * 64, {}, b.as_dict()))

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import platform
 import os
 import re
 import subprocess
 
 from .errors import ContractError, TargetDetectionError
-from .model import TargetSpec
+from .model import DEFAULT_TVM_FFI_VERSION, TargetSpec
 
 
 def normalize_cuda_version(value: str) -> str:
@@ -30,7 +31,7 @@ def normalize_cc(value: str) -> str:
     return f"sm_{major}{minor}{suffix}"
 
 
-def explicit_target(cuda: str, cc: str) -> TargetSpec:
+def explicit_target(cuda: str, cc: str, *, tvm_ffi: str = DEFAULT_TVM_FFI_VERSION) -> TargetSpec:
     machine = os.environ.get("K_DASH_TARGET_ARCH")
     if machine is None:
         # AOT builds on macOS target the Linux x86_64 CUDA fleet by default;
@@ -39,7 +40,7 @@ def explicit_target(cuda: str, cc: str) -> TargetSpec:
     arch = {"x86_64": "x86_64", "aarch64": "aarch64", "arm64": "aarch64"}.get(machine)
     if arch is None:
         raise ContractError("unsupported CPU architecture", stage="target", context={"arch": platform.machine()})
-    return TargetSpec(os="linux", arch=arch, cuda=normalize_cuda_version(cuda), cc=normalize_cc(cc))
+    return TargetSpec(os="linux", arch=arch, cuda=normalize_cuda_version(cuda), cc=normalize_cc(cc), tvm_ffi=tvm_ffi)
 
 
 def _nvcc_version() -> str | None:
@@ -70,4 +71,8 @@ def detect_target() -> TargetSpec:
     arch = {"x86_64": "x86_64", "aarch64": "aarch64"}.get(platform.machine())
     if arch is None or platform.system() != "Linux":
         raise TargetDetectionError("runtime loading supports Linux x86_64/aarch64 only", stage="target-detection")
-    return TargetSpec(os="linux", arch=arch, cuda=cuda, cc=cc)
+    try:
+        tvm_ffi = importlib.metadata.version("apache-tvm-ffi")
+    except importlib.metadata.PackageNotFoundError as error:
+        raise TargetDetectionError("apache-tvm-ffi is required", stage="target-detection") from error
+    return TargetSpec(os="linux", arch=arch, cuda=cuda, cc=cc, tvm_ffi=tvm_ffi)

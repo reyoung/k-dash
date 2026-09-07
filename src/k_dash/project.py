@@ -86,13 +86,24 @@ def source_files(root: Path | str = ".") -> list[Path]:
     load_project(path)
     patterns = _ignore_patterns(path)
     selected: list[Path] = []
-    for candidate in path.rglob("*"):
-        if not candidate.is_file() or candidate.is_symlink():
-            continue
-        relative = candidate.relative_to(path).as_posix()
-        if any(fnmatch.fnmatch(relative, pattern) for pattern in patterns):
-            continue
-        selected.append(candidate)
+    for directory, directories, filenames in os.walk(path, followlinks=False):
+        parent = Path(directory)
+        directories[:] = [
+            name for name in directories
+            if not (parent / name).is_symlink()
+            and not any(
+                fnmatch.fnmatch((parent / name).relative_to(path).as_posix(), pattern.rstrip("/"))
+                or fnmatch.fnmatch((parent / name).relative_to(path).as_posix() + "/", pattern)
+                for pattern in patterns
+            )
+        ]
+        for name in filenames:
+            candidate = parent / name
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            relative = candidate.relative_to(path).as_posix()
+            if not any(fnmatch.fnmatch(relative, pattern) for pattern in patterns):
+                selected.append(candidate)
     return sorted(selected, key=lambda item: item.relative_to(path).as_posix().encode())
 
 

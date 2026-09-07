@@ -65,6 +65,8 @@ def _driver_expression(source: Path, spec: BuildSpec, system: str) -> str:
     manylinuxHostStdenv = basePkgs.overrideCC basePkgs.stdenv manylinuxHostCc;
   }} // (if builtins.hasAttr "cudaPackages_13" cudaPkgs then {{
     cudaPackages_13 = cudaPkgs.cudaPackages_13;
+  }} else {{ }}) // (if builtins.hasAttr "cudaPackages_13_0" cudaPkgs then {{
+    cudaPackages_13_0 = cudaPkgs.cudaPackages_13_0;
   }} else {{ }}) // (if hasCuteDsl then {{
     cutePythonEnv = cudaPkgs.python313.withPackages (ps: [ ps.nvidia-cutlass-dsl ]);
   }} else {{ }});
@@ -155,6 +157,9 @@ def docker_aot(
             network_disabled=False,
             user="0:0",
             security_opt=["seccomp=unconfined"],
+            # Very large daemon defaults make Nix 2.24 close billions of FDs
+            # before exec. Bound this per-container startup work.
+            ulimits=[docker.types.Ulimit(name="nofile", soft=65536, hard=65536)],
             volumes={"k-dash-nix-store": {"bind": "/nix", "mode": "rw"}},
         )
         try:

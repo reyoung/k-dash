@@ -10,6 +10,7 @@ from typing import Any
 
 from .builder import DEFAULT_BUILDER_IMAGE
 from .cache import Cache
+from .model import DEFAULT_TVM_FFI_VERSION
 from .errors import KDashError
 from .project import load_project
 from .publish import local_build, publish_build, publish_release
@@ -36,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--cc", required=True)
     build.add_argument("--args", action="append", default=[], type=_path)
     build.add_argument("--builder-image", default=DEFAULT_BUILDER_IMAGE)
+    build.add_argument("--tvm-ffi-version", default=DEFAULT_TVM_FFI_VERSION)
     build.add_argument(
         "--local-jit",
         action="store_true",
@@ -44,10 +46,11 @@ def _parser() -> argparse.ArgumentParser:
 
     publish = subcommands.add_parser("publish", help="publish source and optional AOT builds")
     publish.add_argument("--version", required=True)
-    publish.add_argument("--cuda-version")
+    publish.add_argument("--cuda-version", action="append", help="CUDA target; repeat to publish multiple toolkits")
     publish.add_argument("--cc")
     publish.add_argument("--aot-args", action="append", default=[], type=_path)
     publish.add_argument("--builder-image", default=DEFAULT_BUILDER_IMAGE)
+    publish.add_argument("--tvm-ffi-version", default=DEFAULT_TVM_FFI_VERSION)
 
     addition = subcommands.add_parser("publish-build", help="append a build from published source")
     addition.add_argument("--version", required=True)
@@ -55,6 +58,7 @@ def _parser() -> argparse.ArgumentParser:
     addition.add_argument("--cc", required=True)
     addition.add_argument("--aot-args", required=True, type=_path)
     addition.add_argument("--builder-image", default=DEFAULT_BUILDER_IMAGE)
+    addition.add_argument("--tvm-ffi-version", default=DEFAULT_TVM_FFI_VERSION)
 
     cache = subcommands.add_parser("cache", help="inspect or maintain local cache")
     cache_subcommands = cache.add_subparsers(dest="cache_command", required=True)
@@ -93,7 +97,7 @@ def _run(args: argparse.Namespace) -> Any:
         load_project(Path.cwd())
         results = local_build(
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,
-            args_files=args.args, builder_image=args.builder_image,
+            args_files=args.args, builder_image=args.builder_image, tvm_ffi=args.tvm_ffi_version,
             use_local_jit=args.local_jit,
         )
         return {
@@ -111,12 +115,12 @@ def _run(args: argparse.Namespace) -> Any:
     if args.command == "publish":
         return publish_release(
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,
-            args_files=args.aot_args, builder_image=args.builder_image,
+            args_files=args.aot_args, builder_image=args.builder_image, tvm_ffi=args.tvm_ffi_version,
         )
     if args.command == "publish-build":
         return publish_build(
             Path.cwd(), version=args.version, cuda=args.cuda_version, cc=args.cc,
-            args_file=args.aot_args, builder_image=args.builder_image,
+            args_file=args.aot_args, builder_image=args.builder_image, tvm_ffi=args.tvm_ffi_version,
         )
     cache = Cache()
     if args.cache_command == "info":

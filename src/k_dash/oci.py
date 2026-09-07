@@ -54,7 +54,8 @@ class OCIClient:
             if not isinstance(username, str) or not isinstance(password, str):
                 raise RegistryAccessFailure("basic credentials are incomplete", stage="registry-auth", context={"registry": config.name})
             return username, password
-        config_path = Path(auth.get("config_path", "~/.docker/config.json")).expanduser()
+        docker_directory = Path(os.environ.get("DOCKER_CONFIG") or "~/.docker").expanduser()
+        config_path = Path(auth.get("config_path", docker_directory / "config.json")).expanduser()
         try:
             docker_config = json.loads(config_path.read_text())
         except (OSError, json.JSONDecodeError) as error:
@@ -106,7 +107,7 @@ class OCIClient:
                 break
         if not encoded:
             raise RegistryAccessFailure(
-                "Docker credential helper entries are not supported without resolved auth",
+                "Docker credentials are missing; run docker login for this registry",
                 stage="registry-auth",
                 context={"registry": config.name},
             )

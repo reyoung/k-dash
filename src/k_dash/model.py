@@ -6,6 +6,9 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 
+DEFAULT_TVM_FFI_VERSION = "0.1.13.post3"
+
+
 @dataclass(frozen=True)
 class TargetSpec:
     os: str
@@ -13,7 +16,7 @@ class TargetSpec:
     cuda: str
     cc: str
     libc: str = "manylinux_2_28"
-    tvm_ffi: str = "0.1.13.post3"
+    tvm_ffi: str = DEFAULT_TVM_FFI_VERSION
 
     def as_dict(self) -> dict[str, str]:
         return asdict(self)
