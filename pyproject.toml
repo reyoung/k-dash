@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
 name = "k-dash"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Content-addressed OCI distribution for TVM-FFI CUDA kernels"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,6 +28,12 @@ k-dash = "k_dash.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/k_dash"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+git_describe_command = ["git", "describe", "--tags", "--long", "--dirty", "--match", "v[0-9]*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

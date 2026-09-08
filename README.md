@@ -32,3 +32,29 @@ backend disables Nix's nested sandbox and build-user group; the CI container mus
 provide isolation. It uses the same frozen release source, locked dependencies,
 BuildSpec and binary validation as Docker AOT. Docker remains the default.
 Registry credentials are not forwarded to the Nix build subprocess environment.
+
+## Releasing to PyPI
+
+Package versions come from `git describe` through `hatch-vcs`. An exact tag such
+as `v0.1.0` builds version `0.1.0`; commits after a tag receive a development
+version. Build from a Git checkout with its tags available.
+
+Before the first release, configure a [PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
+for project `k-dash` (use a pending publisher if the project does not yet exist):
+
+- GitHub owner: `reyoung`
+- Repository: `k-dash`
+- Workflow: `publish.yml`
+- Environment: `pypi`
+
+The workflow uses OIDC, so no PyPI API token secret is required. Push a release
+commit and its annotated tag to build, validate, and publish the wheel:
+
+```bash
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin HEAD
+git push origin v0.1.0
+```
+
+The workflow retains the built wheel as a GitHub Actions artifact and publishes
+it only after its metadata and version match the release tag.
